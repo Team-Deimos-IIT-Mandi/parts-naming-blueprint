@@ -1,3 +1,9 @@
+
+
+https://github.com/user-attachments/assets/abf3ce57-84cf-4173-883b-87dcbd7861e0
+
+
+
 # 🚀 Team Deimos: Rover Naming Blueprint
 
 **A Telemetry-Driven Dynamic Name Hierarchy Manager for IIT Mandi's Mars Rover Team.**
