@@ -328,6 +328,7 @@ let addTargetId = null;
 let editTargetId = null;
 let idCounter = Math.floor(Math.random() * 100000);
 
+// Fetch data from Firebase live - with error handling
 onValue(treeRef, (snapshot) => {
   const data = snapshot.val();
   if (data) {
@@ -336,10 +337,17 @@ onValue(treeRef, (snapshot) => {
   } else {
     if (checkAuthSilent()) saveToCloud();
   }
+}, (error) => {
+  console.error("Firebase connection blocked:", error);
+  alert("Firebase Read Error: Cannot fetch live database. Check your Firebase Rules! Error: " + error.message);
 });
 
+// Save to cloud - with explicit error reporting
 function saveToCloud() {
-  set(treeRef, tree);
+  set(treeRef, tree).catch((error) => {
+    console.error("Firebase save blocked:", error);
+    alert("Save Failed! Firebase blocked the write request. Please make sure your Realtime Database Rules are set to true. Error: " + error.message);
+  });
 }
 
 function checkAuthSilent() {
@@ -348,7 +356,8 @@ function checkAuthSilent() {
 
 function checkAuth() {
   if (checkAuthSilent()) return true;
-  alert('Unauthorized: Please enter the password "nirbhik" in the top right field to save changes.');
+  // FIXED: No longer leaking the password in the alert box
+  alert('Unauthorized: Please enter the correct password in the top right field to save changes.');
   return false;
 }
 
