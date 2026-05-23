@@ -1,60 +1,182 @@
+<div align="center">
 
+#  Team Deimos — Rover Naming Blueprint
 
-https://github.com/user-attachments/assets/abf3ce57-84cf-4173-883b-87dcbd7861e0
+##  Getting Started --- CLICK TO VIEW THE PAGE LIVE
+https://team-deimos-iit-mandi.github.io/parts-naming-blueprint/
 
+**A live, cloud-synced flowchart for generating unique part codes across the IIT Mandi Mars Rover**
 
+<br/>
 
-# 🚀 Team Deimos: Rover Naming Blueprint
+> *When five subsystems merge and three people named their part `BracketFinal_v2.SLDPRT`, you need a system.*  
+> This is that system.
 
-**A Telemetry-Driven Dynamic Name Hierarchy Manager for IIT Mandi's Mars Rover Team.**
-
-This tool solves a critical problem in collaborative CAD design: **SolidWorks file name clashing and structural ambiguity**. By generating unique, standardized prefix codes based on a part's exact assembly hierarchy, this tool ensures every file, folder, and part in the Mars Rover is instantly identifiable and conflict-free.
-
----
-
-### 🟢 Live Dashboard
-Access the live naming tool here:  
-👉 **[team-deimos-iit-mandi.github.io/parts-naming-blueprint](https://team-deimos-iit-mandi.github.io/parts-naming-blueprint/)**
+</div>
 
 ---
 
-## ✨ Key Features
+## 🧭 What This Is
 
-* **Real-Time Cloud Sync:** Powered by Firebase Realtime Database. When one team member updates the blueprint, it instantly updates for everyone else viewing the page.
-* **Smart Code Generation:** Automatically generates 2-4 character acronyms based on part names and builds a complete, dash-separated prefix (e.g., `MR-ARM-L1-BPLT`).
-* **SolidWorks Ready:** Gives you the exact prefix to prepend to your `.SLDPRT` and `.SLDASM` files before merging them into the master assembly.
-* **JSON Export & Import:** Download the entire structural layout as a backup file, or restore the database instantly if needed.
-* **Admin Gatekeeper:** Read-only access for general viewers to prevent accidental deletions, with a password-protected edit mode for subsystem leads.
-* **Aerospace UI:** A custom, dark-mode dashboard with telemetry-style visuals, color-coded hierarchy levels, and full keyboard shortcut support.
+When building a Mars Rover with multiple subsystems and team members working in parallel, **naming collisions are inevitable** — especially when merging SolidWorks assemblies. A part called `Mount.SLDPRT` could belong to the Chassis, the Arm, or the Wheel Hub, and nobody can tell without opening it.
 
-## 🛠️ How to Use
+This tool solves two problems at once:
 
-### For General Team Members (Read-Only)
-1. Open the **[Live Link](https://team-deimos-iit-mandi.github.io/parts-naming-blueprint/)**.
-2. Click through the tree on the left to find your specific subassembly or part.
-3. Look at the **Generated Unique Identifier** on the right.
-4. Click **Copy Prefix Code** and paste it at the start of your SolidWorks filename (e.g., `MR-WMH-WHL_OuterRim.SLDPRT`).
+- **Collision prevention** — every part gets a globally unique code prefix derived from its position in the assembly hierarchy
+- **Instant context** — just reading the filename tells you exactly which rover, which subassembly, and which sub-subassembly the part belongs to
 
-### For Admins & Subsystem Leads (Editing)
-To add new branches, configure acronyms, or delete outdated parts:
-1. Enter the admin password in the top right corner.
-2. Select any node in the tree.
-3. Use the **+ Add Sub-Element Node** or **✎ Configure Node Settings** buttons.
-4. The database will automatically save and sync your changes to the cloud.
-
-## 📂 Hierarchy Legend
-
-| Level | Designation | Color Indicator | Example |
-| :--- | :--- | :--- | :--- |
-| **0** | Core System | Cyan | Mars Rover (`MR`) |
-| **1** | Primary Subassembly | Orange | Robotic Arm (`ARM`) |
-| **2** | Sub-Subassembly | Green | Link 1 (`L1`) |
-| **3+** | Terminal Component | Purple | Base Plate (`BPLT`) |
-
-## 💻 Tech Stack
-* **Frontend:** Vanilla HTML5, CSS3, JavaScript (ES6 Modules)
-* **Backend:** Firebase Realtime Database (BaaS)
-* **Hosting:** GitHub Pages
+The flowchart is the **single source of truth** for the entire team. It lives in the cloud, updates in real time, and anyone with the link can view or edit it.
 
 ---
-*Built for Team Deimos, IIT Mandi.*
+
+## ✨ Features
+
+| Feature | Description |
+|---|---|
+| 🌐 **Live Cloud Sync** | Powered by Firebase Realtime Database — edits by one team member appear instantly for everyone |
+| 🌳 **Interactive Flowchart** | Visual tree of the full rover hierarchy, drag-to-pan, zoom-ready |
+| 🔄 **Dual Layout** | Switch between Top→Bottom and Left→Right orientation |
+| 🌙 **Dark / Light Mode** | Toggle between themes with one click |
+| ➕ **Add Nodes Anywhere** | Extend any branch with new subassemblies or parts |
+| ✏️ **Edit & Delete** | Rename or remove any node; root is protected |
+| 📋 **One-Click Code Copy** | Copy the full prefix code for any node instantly |
+| 🧮 **Auto Acronym** | Leave the code field blank and it generates one from the name |
+| 💾 **Export / Import JSON** | Back up the tree or restore a previous state |
+| 🖨️ **Print to PDF** | Export a snapshot of the flowchart |
+| ⌨️ **Keyboard Shortcuts** | `Enter` to confirm modals, `Esc` to dismiss |
+
+---
+
+## 🗂️ How the Naming System Works
+
+Every part file gets a **prefix code** generated by tracing its path from the root down to its node in the hierarchy. Segments are joined by `-`.
+
+```
+MR  →  WMH  →  WHL  →  YourPartName.SLDPRT
+              ↓
+    MR-WMH-WHL_YourPartName.SLDPRT
+```
+
+### Current Hierarchy & Codes
+
+```
+Mars Rover (MR)
+├── Chassis (CH)
+│   └── [your parts] → MR-CH-*
+│
+├── Wheel Motor Hub (WMH)
+│   ├── Wheel (WHL)              → MR-WMH-WHL-*
+│   └── Hub with Motor (HM)      → MR-WMH-HM-*
+│
+├── Rocker & Differential Bar (RDB)
+│   └── [your parts]             → MR-RDB-*
+│
+├── Robotic Arm (ARM)
+│   ├── Link 1 (L1)              → MR-ARM-L1-*
+│   ├── Link 2 (L2)              → MR-ARM-L2-*
+│   ├── Link 3 (L3)              → MR-ARM-L3-*
+│   └── Z Axis Subsystem (ZAX)   → MR-ARM-ZAX-*
+│
+└── Gripper (GRP)
+    └── [your parts]             → MR-GRP-*
+```
+
+### File Naming Convention
+
+```
+{GENERATED-CODE}_{DescriptiveName}.{extension}
+
+Examples:
+  MR-ARM-L1_BasePlate.SLDPRT
+  MR-WMH-WHL_SpokeBracket.SLDASM
+  MR-CH_MainFrame.SLDPRT
+  MR-GRP_FingerActuator.SLDPRT
+```
+
+> **Rule:** The generated code is the prefix. After it, use `_` then a clear, human-readable description of the part. The code handles uniqueness; the name handles readability.
+
+---
+
+## 🖥️ Using the Flowchart
+
+### Navigating
+- **Scroll** with mouse wheel or touchpad (vertical and horizontal)
+- **Drag to pan** by clicking and dragging on the background
+- **Switch layout** using the 🔄 button in the header
+
+### Adding a new part or subassembly
+1. Hover over any node — a **`+`** button appears in the top-right corner
+2. Click it, enter the full name and an acronym code
+3. Leave the code blank to auto-generate it from the name
+4. Click **Add Node** — it appears in the tree and syncs to all users instantly
+
+### Getting a part's code
+- **Leaf nodes** (parts with no children) always show the full prefix code and a copy button
+- **Intermediate nodes** (subassemblies) have a **👁 View Code** toggle to reveal their code
+
+### Editing or deleting
+- Hover any node and click **✎** to edit its name or acronym
+- The delete button is inside the edit modal — it removes the node and all its children
+
+### Backup & restore
+- **💾 Save JSON** — downloads the full tree as a JSON file (good for version control snapshots)
+- **📁 Load** — imports a JSON backup and syncs it to the cloud
+
+---
+
+## 📁 Repository Structure
+
+```
+deimos-naming-blueprint/
+├── index.html          ← The entire app (single file, no dependencies)
+└── README.md           ← This file
+```
+
+Everything is in one self-contained HTML file. No npm, no build step, no framework.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Vanilla HTML, CSS, JavaScript (ES Modules) |
+| Layout Engine | Custom JS tree layout algorithm with SVG bezier connectors |
+| Database | Firebase Realtime Database (free tier) |
+| Hosting | GitHub Pages |
+| Fonts | Inter + JetBrains Mono (Google Fonts) |
+
+---
+
+## 🤝 Contributing
+
+This tool is built for and by Team Deimos. If you want to add a new subassembly to the hierarchy:
+
+1. Open the live link
+2. Click **`+`** on the relevant parent node
+3. Enter the name and a short acronym
+4. The change is saved automatically for the whole team
+
+If you want to contribute code changes (new features, UI improvements):
+
+1. Fork the repo
+2. Make changes in `index.html`
+3. Open a pull request with a short description of what you changed
+
+---
+
+## ⚠️ Important Notes
+
+- **Do not rename** the code segment of an existing node once team members have already used it for files. Changing `WMH` to `WMOTOR` would break all existing filenames referencing that code.
+- **Acronyms should be unique** within the same level of the hierarchy to avoid confusion (even though the full path makes them technically unique).
+- The Firebase free tier supports up to **1 GB storage and 10 GB/month transfer** — far more than this tool will ever need.
+
+---
+
+<div align="center">
+
+**Built with 🔩 by Team Deimos · IIT Mandi**
+
+*Reach Mars. Name your parts correctly.*
+
+</div>
