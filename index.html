@@ -292,6 +292,77 @@ button {
   color: var(--text-muted); background: var(--bg3);
   border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px;
 }
+
+/* ─── LOCK BUTTON ────────────────────────────────────────── */
+#lock-btn {
+  font-size: 13px; padding: 7px 12px;
+  transition: all 0.18s;
+}
+#lock-btn.locked   { background: var(--bg2); color: var(--danger);  border-color: var(--danger); }
+#lock-btn.unlocked { background: var(--bg2); color: var(--green);   border-color: var(--green); }
+#lock-btn.locked:hover   { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+#lock-btn.unlocked:hover { background: color-mix(in srgb, var(--green)  12%, transparent); }
+
+/* ─── PASSWORD MODAL ─────────────────────────────────────── */
+#pw-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65); z-index: 150;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(6px);
+}
+#pw-overlay.open { display: flex; }
+
+#pw-modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 32px 28px 24px;
+  width: 340px; max-width: 92vw;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  text-align: center;
+}
+#pw-modal .pw-icon {
+  font-size: 36px; margin-bottom: 12px;
+  display: block;
+}
+#pw-modal h2 {
+  font-size: 17px; font-weight: 700; color: var(--text);
+  margin-bottom: 4px;
+}
+#pw-modal p {
+  font-size: 12px; color: var(--text-muted);
+  margin-bottom: 20px; line-height: 1.6;
+}
+#pw-input {
+  width: 100%;
+  background: var(--bg); border: 2px solid var(--border);
+  border-radius: 8px; color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px; letter-spacing: 4px;
+  padding: 11px 14px; outline: none;
+  text-align: center;
+  transition: border-color 0.18s;
+}
+#pw-input:focus { border-color: var(--accent); }
+#pw-input.shake {
+  animation: shake 0.35s ease;
+  border-color: var(--danger) !important;
+}
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  40%      { transform: translateX(8px); }
+  60%      { transform: translateX(-6px); }
+  80%      { transform: translateX(6px); }
+}
+#pw-error {
+  font-size: 11px; color: var(--danger);
+  min-height: 16px; margin-top: 8px;
+  font-weight: 600; letter-spacing: 0.5px;
+}
+#pw-modal .pw-actions {
+  display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end;
+}
 </style>
 </head>
 <body>
@@ -309,6 +380,7 @@ button {
       <button class="btn-secondary" onclick="printPDF()">🖨️ PDF</button>
       <button class="btn-secondary" onclick="importJSON()">📁 Load</button>
       <button class="btn-primary"   onclick="exportJSON()">💾 Save JSON</button>
+      <button id="lock-btn" class="locked" onclick="handleLockBtn()" title="Unlock editing">🔒 Locked</button>
     </div>
   </div>
 
@@ -358,6 +430,22 @@ button {
       <button class="btn-danger"    onclick="confirmDelete()">Delete</button>
       <button class="btn-secondary" onclick="closeEdit()">Cancel</button>
       <button class="btn-primary"   onclick="confirmEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Password Modal -->
+<div id="pw-overlay">
+  <div id="pw-modal">
+    <span class="pw-icon">🔐</span>
+    <h2>Editor Access</h2>
+    <p>Enter the Team Deimos password<br>to unlock editing.</p>
+    <input type="password" id="pw-input" placeholder="••••••" maxlength="20"
+           onkeydown="if(event.key==='Enter') confirmPassword()">
+    <div id="pw-error"></div>
+    <div class="pw-actions">
+      <button class="btn-secondary" onclick="closePwModal()">Cancel</button>
+      <button class="btn-primary"   onclick="confirmPassword()">Unlock</button>
     </div>
   </div>
 </div>
@@ -665,24 +753,36 @@ function buildNodeEl(node) {
     div.appendChild(row);
   }
 
-  // Hover actions
+  // Hover actions — only shown when unlocked
   const acts = document.createElement('div');
   acts.className = 'node-actions';
 
-  const editBtn = document.createElement('button');
-  editBtn.className = 'icon-btn';
-  editBtn.title = 'Edit';
-  editBtn.textContent = '✎';
-  editBtn.onclick = e => { e.stopPropagation(); openEdit(node); };
+  if (isUnlocked) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'icon-btn';
+    editBtn.title = 'Edit';
+    editBtn.textContent = '✎';
+    editBtn.onclick = e => { e.stopPropagation(); openEdit(node); };
 
-  const addBtn = document.createElement('button');
-  addBtn.className = 'icon-btn add-btn';
-  addBtn.title = 'Add child';
-  addBtn.textContent = '+';
-  addBtn.onclick = e => { e.stopPropagation(); openAdd(node.id); };
+    const addBtn = document.createElement('button');
+    addBtn.className = 'icon-btn add-btn';
+    addBtn.title = 'Add child';
+    addBtn.textContent = '+';
+    addBtn.onclick = e => { e.stopPropagation(); openAdd(node.id); };
 
-  acts.appendChild(editBtn);
-  acts.appendChild(addBtn);
+    acts.appendChild(editBtn);
+    acts.appendChild(addBtn);
+  } else {
+    // Show a faint lock hint so users know editing is available
+    const lockHint = document.createElement('button');
+    lockHint.className = 'icon-btn';
+    lockHint.title = 'Unlock to edit';
+    lockHint.textContent = '🔒';
+    lockHint.style.fontSize = '10px';
+    lockHint.onclick = e => { e.stopPropagation(); handleLockBtn(); };
+    acts.appendChild(lockHint);
+  }
+
   div.appendChild(acts);
 
   return div;
@@ -691,7 +791,9 @@ function buildNodeEl(node) {
 function buildAddGhost(node) {
   const btn = document.createElement('button');
   btn.className = 'add-child-node';
-  btn.textContent = '+ Add Sub-Part';
+  btn.textContent = isUnlocked ? '+ Add Sub-Part' : '🔒 Locked';
+  btn.style.opacity = isUnlocked ? '1' : '0.35';
+  btn.style.cursor  = isUnlocked ? 'pointer' : 'default';
   btn.onclick = e => { e.stopPropagation(); openAdd(node.id); };
   return btn;
 }
@@ -733,17 +835,109 @@ function findParent(id, node = tree, parent = null) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   MODALS
+   AUTH — PASSWORD GATE
+   Password: "deimos"
+   Read-only functions (copy, export, PDF, layout, theme) → always allowed
+   Write functions (add node, edit node, delete, import+sync) → require unlock
 ═══════════════════════════════════════════════════════════ */
+const CORRECT_PW = 'deimos';
+let isUnlocked = false;
+
+// What write action to run after successful unlock
+let pendingAction = null;
+
+function updateLockUI() {
+  const btn = document.getElementById('lock-btn');
+  if (isUnlocked) {
+    btn.textContent = '🔓 Unlocked';
+    btn.className = 'unlocked';
+    btn.title = 'Click to lock editing';
+  } else {
+    btn.textContent = '🔒 Locked';
+    btn.className = 'locked';
+    btn.title = 'Click to unlock editing';
+  }
+  // Re-render so node action buttons reflect lock state
+  render();
+}
+
+function handleLockBtn() {
+  if (isUnlocked) {
+    // Lock immediately — no password needed to re-lock
+    isUnlocked = false;
+    updateLockUI();
+    showToast('Editing locked 🔒');
+  } else {
+    // Open password modal to unlock, no pending action (just toggling)
+    pendingAction = null;
+    openPwModal();
+  }
+}
+
+function requireAuth(action) {
+  if (isUnlocked) {
+    action();
+  } else {
+    pendingAction = action;
+    openPwModal();
+  }
+}
+
+function openPwModal() {
+  document.getElementById('pw-input').value = '';
+  document.getElementById('pw-error').textContent = '';
+  document.getElementById('pw-input').classList.remove('shake');
+  document.getElementById('pw-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('pw-input').focus(), 60);
+}
+
+function closePwModal() {
+  document.getElementById('pw-overlay').classList.remove('open');
+  pendingAction = null;
+}
+
+function confirmPassword() {
+  const val = document.getElementById('pw-input').value;
+  if (val === CORRECT_PW) {
+    isUnlocked = true;
+    document.getElementById('pw-overlay').classList.remove('open');
+    updateLockUI();
+    showToast('Editing unlocked 🔓');
+    if (pendingAction) {
+      const action = pendingAction;
+      pendingAction = null;
+      // Small delay so modal closes cleanly before next modal opens
+      setTimeout(action, 120);
+    }
+  } else {
+    const input = document.getElementById('pw-input');
+    const err   = document.getElementById('pw-error');
+    input.classList.remove('shake');
+    // Force reflow so animation re-triggers even on repeated wrong attempts
+    void input.offsetWidth;
+    input.classList.add('shake');
+    err.textContent = 'Incorrect password. Try again.';
+    input.value = '';
+    setTimeout(() => input.focus(), 50);
+  }
+}
+
+window.handleLockBtn    = handleLockBtn;
+window.closePwModal     = closePwModal;
+window.confirmPassword  = confirmPassword;
+
+
 let addTargetId = null;
 let editTargetId = null;
 
 function openAdd(parentId) {
-  addTargetId = parentId;
-  document.getElementById('add-name').value = '';
-  document.getElementById('add-code').value = '';
-  document.getElementById('add-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('add-name').focus(), 50);
+  requireAuth(() => {
+    addTargetId = parentId;
+    document.getElementById('add-name').value = '';
+    document.getElementById('add-code').value = '';
+    document.getElementById('add-overlay').classList.add('open');
+    setTimeout(() => document.getElementById('add-name').focus(), 50);
+  });
 }
 function closeAdd() { document.getElementById('add-overlay').classList.remove('open'); }
 
@@ -764,11 +958,13 @@ function confirmAdd() {
 }
 
 function openEdit(node) {
-  editTargetId = node.id;
-  document.getElementById('edit-name').value = node.name;
-  document.getElementById('edit-code').value = node.code;
-  document.getElementById('edit-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('edit-name').focus(), 50);
+  requireAuth(() => {
+    editTargetId = node.id;
+    document.getElementById('edit-name').value = node.name;
+    document.getElementById('edit-code').value = node.code;
+    document.getElementById('edit-overlay').classList.add('open');
+    setTimeout(() => document.getElementById('edit-name').focus(), 50);
+  });
 }
 function closeEdit() { document.getElementById('edit-overlay').classList.remove('open'); }
 
@@ -844,7 +1040,9 @@ function exportJSON() {
   a.download = 'deimos-flowchart.json';
   a.click();
 }
-function importJSON() { document.getElementById('file-input').click(); }
+function importJSON() {
+  requireAuth(() => document.getElementById('file-input').click());
+}
 function handleImport(e) {
   const file = e.target.files[0]; if (!file) return;
   const r = new FileReader();
