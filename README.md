@@ -4,7 +4,9 @@
 
 ##  Getting Started --- CLICK TO VIEW THE PAGE LIVE
 https://team-deimos-iit-mandi.github.io/parts-naming-blueprint/
+
 you will need a password to edit but not for any other features
+
 **A live, cloud-synced flowchart for generating unique part codes across the IIT Mandi Mars Rover**
 
 <br/>
