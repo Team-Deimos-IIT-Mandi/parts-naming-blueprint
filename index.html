@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Deimos — Rover Naming Flowchart</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+/* ─── THEME TOKENS ──────────────────────────────────────── */
+:root {
+  --bg:           #0f172a;
+  --bg2:          #1e293b;
+  --bg3:          #334155;
+  --border:       #475569;
+  --text:         #f1f5f9;
+  --text-muted:   #94a3b8;
+  --accent:       #38bdf8;
+  --accent-dark:  #0284c7;
+  --green:        #4ade80;
+  --danger:       #f87171;
+  --line:         #38bdf8;
+  --node-bg:      #1e293b;
+  --node-border:  #475569;
+  --header-bg:    #0f172a;
+  --shadow:       0 4px 16px rgba(0,0,0,0.4);
+}
+[data-theme="light"] {
+  --bg:           #f0f4f8;
+  --bg2:          #ffffff;
+  --bg3:          #e2e8f0;
+  --border:       #cbd5e1;
+  --text:         #0f172a;
+  --text-muted:   #64748b;
+  --accent:       #0284c7;
+  --accent-dark:  #0369a1;
+  --green:        #16a34a;
+  --danger:       #dc2626;
+  --line:         #0284c7;
+  --node-bg:      #ffffff;
+  --node-border:  #cbd5e1;
+  --header-bg:    #ffffff;
+  --shadow:       0 4px 16px rgba(0,0,0,0.1);
+}
+
+/* ─── RESET & BASE ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;   /* THE key: body never scrolls — only #canvas scrolls */
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.25s, color 0.25s;
+}
+
+/* Grid background */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.07;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── LAYOUT ────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;        /* exact viewport — no more, no less */
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── HEADER ────────────────────────────────────────────── */
+#header {
+  flex-shrink: 0;       /* never squish — always fixed height */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 24px;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  z-index: 10;
+  flex-wrap: wrap;
+}
+
+.logo h1 { font-size: 17px; font-weight: 700; color: var(--text); }
+.logo span { font-size: 11px; color: var(--accent); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.5px; }
+
+.header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+button {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 14px;
+  transition: all 0.18s;
+  display: inline-flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.btn-primary  { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover  { background: var(--accent-dark); border-color: var(--accent-dark); }
+.btn-secondary { background: var(--bg2); color: var(--text); border-color: var(--border); }
+.btn-secondary:hover { background: var(--bg3); border-color: var(--accent); }
+.btn-danger   { background: transparent; color: var(--danger); border-color: var(--danger); }
+.btn-danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.btn-icon     { padding: 7px 10px; font-size: 14px; }
+
+/* ─── CANVAS AREA — THIS IS WHAT SCROLLS ────────────────── */
+/*
+  KEY ARCHITECTURE:
+  #canvas is position:relative, overflow:auto, flex:1 (fills all space below header).
+  #stage is position:absolute, its size is set by JS to fit the tree exactly.
+  This means the scrollable area = stage size, which the browser knows precisely.
+  Both mouse-wheel AND scrollbar work because overflow:auto is on a normal block element
+  whose child (#stage) has an explicit, JS-set pixel size larger than it.
+*/
+#canvas {
+  flex: 1;              /* fill remaining height after header */
+  position: relative;
+  overflow: auto;       /* scrollbars appear when #stage > #canvas */
+  cursor: grab;
+  -webkit-overflow-scrolling: touch;  /* smooth on iOS */
+}
+#canvas:active { cursor: grabbing; }
+
+/* Scrollbar styling */
+#canvas::-webkit-scrollbar { width: 10px; height: 10px; }
+#canvas::-webkit-scrollbar-track { background: var(--bg); }
+#canvas::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; border: 2px solid var(--bg); }
+#canvas::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Stage: sized by JS, contains all nodes + SVG lines */
+#stage {
+  position: absolute;
+  top: 0; left: 0;
+  /* width/height set by JS */
+}
+
+/* SVG overlay for connector lines — sits behind nodes */
+#lines-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── NODES ─────────────────────────────────────────────── */
+.node {
+  position: absolute;   /* JS positions each node precisely */
+  z-index: 2;
+  background: var(--node-bg);
+  border: 2px solid var(--node-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  width: 180px;
+  box-shadow: var(--shadow);
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.15s;
+  cursor: default;
+  user-select: none;
+}
+.node:hover { border-color: var(--accent); transform: translateY(-2px); }
+.node.selected { border-color: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 25%, transparent); }
+
+.node-name  { font-size: 13px; font-weight: 600; color: var(--text); text-align: center; margin-bottom: 5px; }
+.node-code-tag {
+  display: block; text-align: center; margin: 0 auto 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 4px; padding: 2px 8px;
+}
+
+/* Leaf: final code block */
+.final-block {
+  margin-top: 8px;
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+  border: 1px dashed var(--green);
+  border-radius: 6px; padding: 7px 8px; text-align: center;
+}
+.final-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.final-code  { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: var(--green); margin-bottom: 6px; word-break: break-all; }
+.btn-copy-sm {
+  width: 100%; padding: 4px 8px; font-size: 10px; font-weight: 600;
+  background: color-mix(in srgb, var(--green) 20%, transparent);
+  color: var(--green); border: 1px solid var(--green); border-radius: 4px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-copy-sm:hover { background: var(--green); color: #000; }
+
+/* Intermediate: view-code toggle */
+.toggle-row { margin-top: 8px; text-align: center; }
+.btn-toggle-code {
+  font-size: 10px; color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+  border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-toggle-code:hover { color: var(--accent); border-color: var(--accent); }
+.hidden-code-row {
+  display: none; align-items: center; gap: 6px; justify-content: center; margin-top: 5px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent);
+  background: var(--bg); border: 1px dashed var(--border); border-radius: 4px; padding: 5px 8px;
+}
+.btn-copy-inline { background: none; border: none; font-size: 13px; cursor: pointer; color: var(--text-muted); padding: 0 2px; }
+.btn-copy-inline:hover { color: var(--accent); }
+
+/* Hover action buttons */
+.node-actions {
+  position: absolute; top: -11px; right: -11px;
+  display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s;
+}
+.node:hover .node-actions { opacity: 1; }
+.icon-btn {
+  width: 22px; height: 22px; border-radius: 50%; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: var(--bg3); color: var(--text);
+  cursor: pointer; transition: all 0.15s;
+}
+.icon-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.icon-btn.add-btn { background: var(--green); color: #000; border-color: var(--green); }
+
+/* Add-child button rendered as a ghost node */
+.add-child-node {
+  position: absolute;
+  width: 160px;
+  z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed var(--border); border-radius: 10px;
+  padding: 10px 8px;
+  color: var(--text-muted); font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all 0.18s;
+  background: transparent;
+}
+.add-child-node:hover { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+
+/* ─── SVG LINES ─────────────────────────────────────────── */
+.connector { stroke: var(--line); stroke-width: 2; fill: none; }
+.arrow-head { fill: var(--line); }
+
+/* ─── MODALS ─────────────────────────────────────────────── */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55); z-index: 100;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(3px);
+}
+.overlay.open { display: flex; }
+.modal {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; width: 360px; max-width: 92vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.modal h2 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 18px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+.field input {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-family: 'Inter', sans-serif;
+  font-size: 14px; padding: 9px 11px; outline: none; transition: border-color 0.15s;
+}
+.field input:focus { border-color: var(--accent); }
+.field .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+.modal-actions .btn-danger { margin-right: auto; }
+
+/* ─── TOAST ──────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 22px; right: 22px; z-index: 200;
+  background: var(--green); color: #000; font-weight: 700; font-size: 12px;
+  padding: 10px 20px; border-radius: 6px;
+  opacity: 0; transform: translateY(8px);
+  transition: all 0.25s; pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+
+/* ─── LAYOUT TOGGLE INDICATOR ────────────────────────────── */
+#layout-badge {
+  font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted); background: var(--bg3);
+  border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px;
+}
+
+/* ─── LOCK BUTTON ────────────────────────────────────────── */
+#lock-btn {
+  font-size: 13px; padding: 7px 12px;
+  transition: all 0.18s;
+}
+#lock-btn.locked   { background: var(--bg2); color: var(--danger);  border-color: var(--danger); }
+#lock-btn.unlocked { background: var(--bg2); color: var(--green);   border-color: var(--green); }
+#lock-btn.locked:hover   { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+#lock-btn.unlocked:hover { background: color-mix(in srgb, var(--green)  12%, transparent); }
+
+/* ─── PASSWORD MODAL ─────────────────────────────────────── */
+#pw-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65); z-index: 150;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(6px);
+}
+#pw-overlay.open { display: flex; }
+
+#pw-modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 32px 28px 24px;
+  width: 340px; max-width: 92vw;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  text-align: center;
+}
+#pw-modal .pw-icon {
+  font-size: 36px; margin-bottom: 12px;
+  display: block;
+}
+#pw-modal h2 {
+  font-size: 17px; font-weight: 700; color: var(--text);
+  margin-bottom: 4px;
+}
+#pw-modal p {
+  font-size: 12px; color: var(--text-muted);
+  margin-bottom: 20px; line-height: 1.6;
+}
+#pw-input {
+  width: 100%;
+  background: var(--bg); border: 2px solid var(--border);
+  border-radius: 8px; color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px; letter-spacing: 4px;
+  padding: 11px 14px; outline: none;
+  text-align: center;
+  transition: border-color 0.18s;
+}
+#pw-input:focus { border-color: var(--accent); }
+#pw-input.shake {
+  animation: shake 0.35s ease;
+  border-color: var(--danger) !important;
+}
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  40%      { transform: translateX(8px); }
+  60%      { transform: translateX(-6px); }
+  80%      { transform: translateX(6px); }
+}
+#pw-error {
+  font-size: 11px; color: var(--danger);
+  min-height: 16px; margin-top: 8px;
+  font-weight: 600; letter-spacing: 0.5px;
+}
+#pw-modal .pw-actions {
+  display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="header">
+    <div class="logo">
+      <h1>Team Deimos Blueprint</h1>
+      <span>IIT Mandi · Dynamic Assembly Flowchart</span>
+    </div>
+    <div class="header-right">
+      <span id="layout-badge">TOP → BOTTOM</span>
+      <button class="btn-secondary" id="layoutBtn" onclick="toggleLayout()">🔄 Left→Right</button>
+      <button class="btn-secondary" onclick="toggleTheme()" id="themeBtn">☀️ Light</button>
+      <button class="btn-secondary" onclick="printPDF()">🖨️ PDF</button>
+      <button class="btn-secondary" onclick="importJSON()">📁 Load</button>
+      <button class="btn-primary"   onclick="exportJSON()">💾 Save JSON</button>
+      <button id="lock-btn" class="locked" onclick="handleLockBtn()" title="Unlock editing">🔒 Locked</button>
+    </div>
+  </div>
+
+  <!-- THE SCROLL CONTAINER -->
+  <div id="canvas">
+    <!-- Stage is sized by JS; holds SVG lines + absolutely-positioned nodes -->
+    <div id="stage">
+      <svg id="lines-svg"></svg>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add Modal -->
+<div class="overlay" id="add-overlay">
+  <div class="modal">
+    <h2>Add Node</h2>
+    <div class="field">
+      <label>Full Name</label>
+      <input type="text" id="add-name" placeholder="e.g. Suspension Link">
+    </div>
+    <div class="field">
+      <label>Acronym Code <span style="font-weight:400">(max 10 chars)</span></label>
+      <input type="text" id="add-code" placeholder="e.g. SL" maxlength="10">
+      <div class="hint">Leave blank to auto-generate.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeAdd()">Cancel</button>
+      <button class="btn-primary"   onclick="confirmAdd()">Add Node</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="overlay" id="edit-overlay">
+  <div class="modal">
+    <h2>Edit Node</h2>
+    <div class="field">
+      <label>Full Name</label>
+      <input type="text" id="edit-name">
+    </div>
+    <div class="field">
+      <label>Acronym Code</label>
+      <input type="text" id="edit-code" maxlength="10">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-danger"    onclick="confirmDelete()">Delete</button>
+      <button class="btn-secondary" onclick="closeEdit()">Cancel</button>
+      <button class="btn-primary"   onclick="confirmEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Password Modal -->
+<div id="pw-overlay">
+  <div id="pw-modal">
+    <span class="pw-icon">🔐</span>
+    <h2>Editor Access</h2>
+    <p>Enter the Team Deimos password<br>to unlock editing.</p>
+    <input type="password" id="pw-input" placeholder="••••••" maxlength="20"
+           onkeydown="if(event.key==='Enter') confirmPassword()">
+    <div id="pw-error"></div>
+    <div class="pw-actions">
+      <button class="btn-secondary" onclick="closePwModal()">Cancel</button>
+      <button class="btn-primary"   onclick="confirmPassword()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast">Copied!</div>
+<input type="file" id="file-input" accept=".json" style="display:none" onchange="handleImport(event)">
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+/* ═══════════════════════════════════════════════════════════
+   FIREBASE
+═══════════════════════════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyBhK24n1RN09_XVFZqAcETWGnieN3vnDj8",
+  authDomain: "mech-team-parts-naming.firebaseapp.com",
+  databaseURL: "https://mech-team-parts-naming-default-rtdb.firebaseio.com",
+  projectId: "mech-team-parts-naming",
+  storageBucket: "mech-team-parts-naming.firebasestorage.app",
+  messagingSenderId: "473914172805",
+  appId: "1:473914172805:web:7c1a9f1673f12ec6c7d0ec"
+};
+const fbApp  = initializeApp(firebaseConfig);
+const db     = getDatabase(fbApp);
+const treeRef = ref(db, 'rover-tree');
+
+let saveTimer = null;
+function saveToCloud() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => set(treeRef, tree).catch(console.error), 500);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DATA
+═══════════════════════════════════════════════════════════ */
+let tree = {
+  id:'root', name:'Mars Rover', code:'MR', level:0, collapsed:false,
+  children:[
+    { id:'chassis', name:'Chassis', code:'CH', level:1, collapsed:false, children:[] },
+    { id:'wmh', name:'Wheel Motor Hub', code:'WMH', level:1, collapsed:false, children:[
+        { id:'wheel',    name:'Wheel',          code:'WHL', level:2, collapsed:false, children:[] },
+        { id:'hubmotor', name:'Hub with Motor', code:'HM',  level:2, collapsed:false, children:[] }
+    ]},
+    { id:'rd',  name:'Rocker & Differential Bar', code:'RDB', level:1, collapsed:false, children:[] },
+    { id:'arm', name:'Robotic Arm', code:'ARM', level:1, collapsed:false, children:[
+        { id:'link1', name:'Link 1',           code:'L1',  level:2, collapsed:false, children:[] },
+        { id:'link2', name:'Link 2',           code:'L2',  level:2, collapsed:false, children:[] },
+        { id:'link3', name:'Link 3',           code:'L3',  level:2, collapsed:false, children:[] },
+        { id:'zaxis', name:'Z Axis Subsystem', code:'ZAX', level:2, collapsed:false, children:[] }
+    ]},
+    { id:'grip', name:'Gripper', code:'GRP', level:1, collapsed:false, children:[] }
+  ]
+};
+
+onValue(treeRef, snap => {
+  const d = snap.val();
+  if (d) tree = d;
+  else    saveToCloud();
+  render();
+});
+
+/* ═══════════════════════════════════════════════════════════
+   LAYOUT ENGINE
+   Strategy: compute (x,y) for every node in JS, then:
+   1. Set #stage size to bounding box + padding
+   2. Place each .node div with position:absolute
+   3. Draw SVG lines between parent center-bottom → child center-top (TTB)
+      or parent center-right → child center-left (LR)
+═══════════════════════════════════════════════════════════ */
+
+const NODE_W  = 180;
+const NODE_PAD_X = 40;   // horizontal gap between sibling trees
+const NODE_PAD_Y = 80;   // vertical gap between levels
+const STAGE_PAD  = 60;   // padding around whole tree inside stage
+
+let layoutMode = 'ttb'; // 'ttb' | 'lr'
+let selectedId = null;
+let idCounter  = Math.floor(Math.random() * 1e6);
+
+/* Measure the rendered height of a node (depends on content) */
+function estimateNodeH(node) {
+  const isLeaf = !node.children || node.children.length === 0;
+  // base: name + code tag
+  let h = 12 + 20 + 5 + 22 + 6; // padding top/bot + name + gap + tag + gap
+  if (isLeaf) h += 8 + 22 + 22 + 26 + 12; // final block
+  else        h += 8 + 22 + 12;            // toggle row
+  return Math.max(h, 110);
+}
+
+/* ── STEP 1: assign sizes to every node recursively ── */
+function measureTree(node) {
+  node._w = NODE_W;
+  node._h = estimateNodeH(node);
+
+  if (!node.children || node.children.length === 0 || node.collapsed) {
+    node._subtreeW = node._w;
+    node._subtreeH = node._h;
+    return;
+  }
+
+  node.children.forEach(measureTree);
+
+  if (layoutMode === 'ttb') {
+    // TTB: subtree width = sum of children subtree widths + gaps
+    const childrenW = node.children.reduce((s,c) => s + c._subtreeW, 0)
+                    + (node.children.length - 1) * NODE_PAD_X;
+    node._subtreeW = Math.max(node._w, childrenW);
+    const maxChildH = Math.max(...node.children.map(c => c._subtreeH));
+    node._subtreeH  = node._h + NODE_PAD_Y + maxChildH;
+  } else {
+    // LR: subtree height = sum of children subtree heights + gaps
+    const childrenH = node.children.reduce((s,c) => s + c._subtreeH, 0)
+                    + (node.children.length - 1) * NODE_PAD_X;
+    node._subtreeH  = Math.max(node._h, childrenH);
+    const maxChildW = Math.max(...node.children.map(c => c._subtreeW));
+    node._subtreeW  = node._w + NODE_PAD_Y + maxChildW;
+  }
+}
+
+/* ── STEP 2: assign (x,y) top-left of each node ── */
+function positionTree(node, ox, oy) {
+  if (layoutMode === 'ttb') {
+    // Center this node over its subtree
+    node._x = ox + (node._subtreeW - node._w) / 2;
+    node._y = oy;
+
+    if (!node.children || node.children.length === 0 || node.collapsed) return;
+
+    let cx = ox;
+    for (const child of node.children) {
+      positionTree(child, cx, oy + node._h + NODE_PAD_Y);
+      cx += child._subtreeW + NODE_PAD_X;
+    }
+  } else {
+    // LR: center this node vertically within its subtree
+    node._x = ox;
+    node._y = oy + (node._subtreeH - node._h) / 2;
+
+    if (!node.children || node.children.length === 0 || node.collapsed) return;
+
+    let cy = oy;
+    for (const child of node.children) {
+      positionTree(child, ox + node._w + NODE_PAD_Y, cy);
+      cy += child._subtreeH + NODE_PAD_X;
+    }
+  }
+}
+
+/* ── STEP 3: collect flat list ── */
+function flattenTree(node, acc = []) {
+  acc.push(node);
+  if (node.children && !node.collapsed)
+    node.children.forEach(c => flattenTree(c, acc));
+  return acc;
+}
+
+/* ── STEP 4: Render everything ── */
+function render() {
+  measureTree(tree);
+  positionTree(tree, STAGE_PAD, STAGE_PAD);
+
+  const nodes = flattenTree(tree);
+
+  // Stage size
+  const stageW = Math.max(...nodes.map(n => n._x + n._w)) + STAGE_PAD;
+  const stageH = Math.max(...nodes.map(n => n._y + n._h)) + STAGE_PAD;
+  const stage  = document.getElementById('stage');
+  stage.style.width  = stageW + 'px';
+  stage.style.height = stageH + 'px';
+
+  // Clear old nodes (keep SVG)
+  Array.from(stage.children).forEach(el => {
+    if (el.id !== 'lines-svg') el.remove();
+  });
+
+  // Draw lines in SVG
+  const svg = document.getElementById('lines-svg');
+  svg.innerHTML = '';
+  svg.setAttribute('width',  stageW);
+  svg.setAttribute('height', stageH);
+  // Arrow marker
+  svg.innerHTML = `
+    <defs>
+      <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+        <path d="M0,0 L8,4 L0,8 Z" class="arrow-head"/>
+      </marker>
+    </defs>`;
+
+  nodes.forEach(node => {
+    if (!node.children || node.collapsed) return;
+    node.children.forEach(child => {
+      let x1, y1, x2, y2;
+      if (layoutMode === 'ttb') {
+        x1 = node._x  + node._w  / 2;
+        y1 = node._y  + node._h;
+        x2 = child._x + child._w / 2;
+        y2 = child._y - 1;
+      } else {
+        x1 = node._x  + node._w;
+        y1 = node._y  + node._h  / 2;
+        x2 = child._x - 1;
+        y2 = child._y + child._h / 2;
+      }
+      const my = (y1 + y2) / 2;
+      const mx = (x1 + x2) / 2;
+      const d  = layoutMode === 'ttb'
+        ? `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`
+        : `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('class', 'connector');
+      path.setAttribute('marker-end', 'url(#arrow)');
+      svg.appendChild(path);
+    });
+  });
+
+  // Render node divs
+  nodes.forEach(node => {
+    const el = buildNodeEl(node);
+    el.style.left = node._x + 'px';
+    el.style.top  = node._y + 'px';
+    el.style.width = node._w + 'px';
+    stage.appendChild(el);
+
+    // Add-child ghost button (only for non-leaf)
+    // Only show for nodes that have children rendered (or could have them)
+    // We always show it so new branches can always be added
+    const addGhost = buildAddGhost(node);
+    if (layoutMode === 'ttb') {
+      addGhost.style.left = (node._x + (node._w - 160)/2) + 'px';
+      addGhost.style.top  = (node._y + node._h + NODE_PAD_Y - 38) + 'px';
+      // Only show below if no children (leaf add); if has children, show via ul add btn
+      if (node.children && node.children.length > 0 && !node.collapsed) {
+        // Already handled by + icon on node hover
+        addGhost.style.display = 'none';
+      }
+    } else {
+      addGhost.style.left = (node._x + node._w + NODE_PAD_Y - 40) + 'px';
+      addGhost.style.top  = (node._y + (node._h - 34)/2) + 'px';
+      if (node.children && node.children.length > 0 && !node.collapsed) {
+        addGhost.style.display = 'none';
+      }
+    }
+    stage.appendChild(addGhost);
+  });
+}
+
+/* ── Build a node DOM element ── */
+function buildNodeEl(node) {
+  const div = document.createElement('div');
+  div.className = 'node' + (selectedId === node.id ? ' selected' : '');
+  div.onclick = e => { e.stopPropagation(); selectedId = node.id; render(); };
+
+  // Name + code tag
+  const name = document.createElement('div');
+  name.className = 'node-name';
+  name.textContent = node.name;
+  div.appendChild(name);
+
+  const tag = document.createElement('div');
+  tag.className = 'node-code-tag';
+  tag.textContent = node.code;
+  div.appendChild(tag);
+
+  const isLeaf = !node.children || node.children.length === 0;
+  const fullCode = generateCode(node.id);
+
+  if (isLeaf) {
+    const fb = document.createElement('div');
+    fb.className = 'final-block';
+    fb.innerHTML = `
+      <div class="final-label">File Prefix</div>
+      <div class="final-code">${fullCode}</div>`;
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn-copy-sm';
+    copyBtn.textContent = '📋 Copy Code';
+    copyBtn.onclick = e => { e.stopPropagation(); copyText(fullCode); };
+    fb.appendChild(copyBtn);
+    div.appendChild(fb);
+  } else {
+    const row = document.createElement('div');
+    row.className = 'toggle-row';
+    const tb = document.createElement('button');
+    tb.className = 'btn-toggle-code';
+    tb.textContent = '👁 View Code';
+    const hcr = document.createElement('div');
+    hcr.className = 'hidden-code-row';
+    const cspan = document.createElement('span');
+    cspan.textContent = fullCode;
+    const ic = document.createElement('button');
+    ic.className = 'btn-copy-inline';
+    ic.textContent = '📋';
+    ic.onclick = e => { e.stopPropagation(); copyText(fullCode); };
+    hcr.appendChild(cspan);
+    hcr.appendChild(ic);
+    tb.onclick = e => {
+      e.stopPropagation();
+      const hidden = hcr.style.display !== 'flex';
+      hcr.style.display = hidden ? 'flex' : 'none';
+      tb.textContent = hidden ? '🙈 Hide Code' : '👁 View Code';
+    };
+    row.appendChild(tb);
+    row.appendChild(hcr);
+    div.appendChild(row);
+  }
+
+  // Hover actions — only shown when unlocked
+  const acts = document.createElement('div');
+  acts.className = 'node-actions';
+
+  if (isUnlocked) {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'icon-btn';
+    editBtn.title = 'Edit';
+    editBtn.textContent = '✎';
+    editBtn.onclick = e => { e.stopPropagation(); openEdit(node); };
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'icon-btn add-btn';
+    addBtn.title = 'Add child';
+    addBtn.textContent = '+';
+    addBtn.onclick = e => { e.stopPropagation(); openAdd(node.id); };
+
+    acts.appendChild(editBtn);
+    acts.appendChild(addBtn);
+  } else {
+    // Show a faint lock hint so users know editing is available
+    const lockHint = document.createElement('button');
+    lockHint.className = 'icon-btn';
+    lockHint.title = 'Unlock to edit';
+    lockHint.textContent = '🔒';
+    lockHint.style.fontSize = '10px';
+    lockHint.onclick = e => { e.stopPropagation(); handleLockBtn(); };
+    acts.appendChild(lockHint);
+  }
+
+  div.appendChild(acts);
+
+  return div;
+}
+
+function buildAddGhost(node) {
+  const btn = document.createElement('button');
+  btn.className = 'add-child-node';
+  btn.textContent = isUnlocked ? '+ Add Sub-Part' : '🔒 Locked';
+  btn.style.opacity = isUnlocked ? '1' : '0.35';
+  btn.style.cursor  = isUnlocked ? 'pointer' : 'default';
+  btn.onclick = e => { e.stopPropagation(); openAdd(node.id); };
+  return btn;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CODE GENERATION
+═══════════════════════════════════════════════════════════ */
+function getPath(nodeId, node, path = []) {
+  if (node.id === nodeId) return [...path, node];
+  for (const c of (node.children || [])) {
+    const r = getPath(nodeId, c, [...path, node]);
+    if (r) return r;
+  }
+  return null;
+}
+function generateCode(nodeId) {
+  const p = getPath(nodeId, tree);
+  return p ? p.map(n => n.code).join('-') : '';
+}
+function autoAcronym(name) {
+  const words = name.trim().split(/\s+/);
+  return words.length === 1
+    ? name.slice(0,3).toUpperCase()
+    : words.map(w => w[0]).join('').toUpperCase().slice(0,5);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TREE HELPERS
+═══════════════════════════════════════════════════════════ */
+function getNodeById(id, node = tree) {
+  if (node.id === id) return node;
+  for (const c of (node.children || [])) { const r = getNodeById(id, c); if (r) return r; }
+  return null;
+}
+function findParent(id, node = tree, parent = null) {
+  if (node.id === id) return parent;
+  for (const c of (node.children || [])) { const r = findParent(id, c, node); if (r !== undefined) return r; }
+  return undefined;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AUTH — PASSWORD GATE
+   Password: "deimos"
+   Read-only functions (copy, export, PDF, layout, theme) → always allowed
+   Write functions (add node, edit node, delete, import+sync) → require unlock
+═══════════════════════════════════════════════════════════ */
+const CORRECT_PW = 'deimos';
+let isUnlocked = false;
+
+// What write action to run after successful unlock
+let pendingAction = null;
+
+function updateLockUI() {
+  const btn = document.getElementById('lock-btn');
+  if (isUnlocked) {
+    btn.textContent = '🔓 Unlocked';
+    btn.className = 'unlocked';
+    btn.title = 'Click to lock editing';
+  } else {
+    btn.textContent = '🔒 Locked';
+    btn.className = 'locked';
+    btn.title = 'Click to unlock editing';
+  }
+  // Re-render so node action buttons reflect lock state
+  render();
+}
+
+function handleLockBtn() {
+  if (isUnlocked) {
+    // Lock immediately — no password needed to re-lock
+    isUnlocked = false;
+    updateLockUI();
+    showToast('Editing locked 🔒');
+  } else {
+    // Open password modal to unlock, no pending action (just toggling)
+    pendingAction = null;
+    openPwModal();
+  }
+}
+
+function requireAuth(action) {
+  if (isUnlocked) {
+    action();
+  } else {
+    pendingAction = action;
+    openPwModal();
+  }
+}
+
+function openPwModal() {
+  document.getElementById('pw-input').value = '';
+  document.getElementById('pw-error').textContent = '';
+  document.getElementById('pw-input').classList.remove('shake');
+  document.getElementById('pw-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('pw-input').focus(), 60);
+}
+
+function closePwModal() {
+  document.getElementById('pw-overlay').classList.remove('open');
+  pendingAction = null;
+}
+
+function confirmPassword() {
+  const val = document.getElementById('pw-input').value;
+  if (val === CORRECT_PW) {
+    isUnlocked = true;
+    document.getElementById('pw-overlay').classList.remove('open');
+    updateLockUI();
+    showToast('Editing unlocked 🔓');
+    if (pendingAction) {
+      const action = pendingAction;
+      pendingAction = null;
+      // Small delay so modal closes cleanly before next modal opens
+      setTimeout(action, 120);
+    }
+  } else {
+    const input = document.getElementById('pw-input');
+    const err   = document.getElementById('pw-error');
+    input.classList.remove('shake');
+    // Force reflow so animation re-triggers even on repeated wrong attempts
+    void input.offsetWidth;
+    input.classList.add('shake');
+    err.textContent = 'Incorrect password. Try again.';
+    input.value = '';
+    setTimeout(() => input.focus(), 50);
+  }
+}
+
+window.handleLockBtn    = handleLockBtn;
+window.closePwModal     = closePwModal;
+window.confirmPassword  = confirmPassword;
+
+
+let addTargetId = null;
+let editTargetId = null;
+
+function openAdd(parentId) {
+  requireAuth(() => {
+    addTargetId = parentId;
+    document.getElementById('add-name').value = '';
+    document.getElementById('add-code').value = '';
+    document.getElementById('add-overlay').classList.add('open');
+    setTimeout(() => document.getElementById('add-name').focus(), 50);
+  });
+}
+function closeAdd() { document.getElementById('add-overlay').classList.remove('open'); }
+
+function confirmAdd() {
+  const name = document.getElementById('add-name').value.trim();
+  if (!name) { alert('Enter a name.'); return; }
+  let code = document.getElementById('add-code').value.trim().toUpperCase() || autoAcronym(name);
+  const parent = getNodeById(addTargetId);
+  if (!parent) return;
+  if (!parent.children) parent.children = [];
+  parent.children.push({
+    id: 'n' + (++idCounter) + '_' + Date.now(),
+    name, code, level: parent.level + 1, collapsed: false, children: []
+  });
+  closeAdd();
+  saveToCloud();
+  showToast('Node added!');
+}
+
+function openEdit(node) {
+  requireAuth(() => {
+    editTargetId = node.id;
+    document.getElementById('edit-name').value = node.name;
+    document.getElementById('edit-code').value = node.code;
+    document.getElementById('edit-overlay').classList.add('open');
+    setTimeout(() => document.getElementById('edit-name').focus(), 50);
+  });
+}
+function closeEdit() { document.getElementById('edit-overlay').classList.remove('open'); }
+
+function confirmEdit() {
+  const name = document.getElementById('edit-name').value.trim();
+  let code = document.getElementById('edit-code').value.trim().toUpperCase();
+  if (!name) { alert('Name required.'); return; }
+  if (!code) code = autoAcronym(name);
+  const node = getNodeById(editTargetId);
+  if (!node) return;
+  node.name = name; node.code = code;
+  closeEdit();
+  saveToCloud();
+  showToast('Saved!');
+}
+
+function confirmDelete() {
+  if (editTargetId === 'root') { alert('Cannot delete root.'); return; }
+  if (!confirm('Delete node and all its children?')) return;
+  const parent = findParent(editTargetId);
+  if (!parent) return;
+  parent.children = parent.children.filter(c => c.id !== editTargetId);
+  if (selectedId === editTargetId) selectedId = null;
+  closeEdit();
+  saveToCloud();
+  showToast('Deleted.');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════ */
+function copyText(txt) {
+  navigator.clipboard.writeText(txt).then(() => showToast('Code copied!'));
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LAYOUT TOGGLE
+═══════════════════════════════════════════════════════════ */
+function toggleLayout() {
+  layoutMode = layoutMode === 'ttb' ? 'lr' : 'ttb';
+  document.getElementById('layoutBtn').textContent =
+    layoutMode === 'ttb' ? '🔄 Left→Right' : '🔄 Top→Bottom';
+  document.getElementById('layout-badge').textContent =
+    layoutMode === 'ttb' ? 'TOP → BOTTOM' : 'LEFT → RIGHT';
+  render();
+}
+window.toggleLayout = toggleLayout;
+
+/* ═══════════════════════════════════════════════════════════
+   THEME
+═══════════════════════════════════════════════════════════ */
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('themeBtn').textContent = isDark ? '🌙 Dark' : '☀️ Light';
+}
+window.toggleTheme = toggleTheme;
+
+/* ═══════════════════════════════════════════════════════════
+   EXPORT / IMPORT
+═══════════════════════════════════════════════════════════ */
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(tree, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'deimos-flowchart.json';
+  a.click();
+}
+function importJSON() {
+  requireAuth(() => document.getElementById('file-input').click());
+}
+function handleImport(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try { tree = JSON.parse(ev.target.result); saveToCloud(); showToast('Loaded!'); }
+    catch { alert('Invalid JSON.'); }
+  };
+  r.readAsText(file);
+}
+function printPDF() { window.print(); }
+
+window.exportJSON  = exportJSON;
+window.importJSON  = importJSON;
+window.handleImport = handleImport;
+window.printPDF    = printPDF;
+window.closeAdd    = closeAdd;
+window.confirmAdd  = confirmAdd;
+window.closeEdit   = closeEdit;
+window.confirmEdit = confirmEdit;
+window.confirmDelete = confirmDelete;
+
+/* ═══════════════════════════════════════════════════════════
+   CANVAS DRAG-TO-PAN
+═══════════════════════════════════════════════════════════ */
+const canvas = document.getElementById('canvas');
+let panning = false, panX, panY, panSL, panST;
+canvas.addEventListener('mousedown', e => {
+  if (e.target.closest('.node') || e.target.closest('button')) return;
+  panning = true;
+  panX = e.clientX; panY = e.clientY;
+  panSL = canvas.scrollLeft; panST = canvas.scrollTop;
+});
+window.addEventListener('mousemove', e => {
+  if (!panning) return;
+  canvas.scrollLeft = panSL - (e.clientX - panX);
+  canvas.scrollTop  = panST - (e.clientY - panY);
+});
+window.addEventListener('mouseup', () => panning = false);
+
+/* ═══════════════════════════════════════════════════════════
+   KEYBOARD
+═══════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeAdd(); closeEdit(); }
+  if (e.key === 'Enter') {
+    if (document.getElementById('add-overlay').classList.contains('open')) confirmAdd();
+    if (document.getElementById('edit-overlay').classList.contains('open')) confirmEdit();
+  }
+});
+</script>
+</body>
+</html>
